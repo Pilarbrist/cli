@@ -2,7 +2,8 @@ resource_types:
 - name: terraform
   type: docker-image
   source:
-    repository: ljfranklin/terraform-resource:beta-backend
+    repository: ljfranklin/terraform-resource
+    tag: beta-backend
 - name: bosh-deployment
   type: docker-image
   source:
@@ -16,18 +17,12 @@ resources:
   - name: terraform
     type: terraform
     source:
-      storage:
-        backend_type: gcs
-        # backend_config:
-        #   bucket: ((bosh-lite-storage-bucket))
-        #   prefix: terraform_state_files/
-        #   region: ((bosh-lite-region))
-        #   credentials: ((bosh-lite-gcp-json-key))
-        backend_config:
-          bucket: test
-          prefix: terraform_state_files/
-          region: test
-          credentials: test
+      backend_type: gcs
+      backend_config:
+        bucket: ((bosh-lite-storage-bucket))
+        prefix: terraform_state_files/
+        region: ((bosh-lite-region))
+        credentials: {{bosh-lite-gcp-json-key}}
   - name: capi-ci
     type: git
     source:

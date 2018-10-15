@@ -59,7 +59,7 @@ configure_bosh_lite_pool_pipeline() {
     -p $name \
     -c $pipelines_path/cli-dev-bosh-lite/pipeline.yml \
     -v bosh-lite-dns-zone-name=bosh-lite-pool \
-    -v bosh-lite-gcp-json-key="$(lpass show Shared-CLI/bosh-service-account-gcp-creds --notes)" \
+    -v bosh-lite-gcp-json-key="$(lpass show Shared-CLI/bosh-service-account-gcp-creds --notes | jq -c .)" \
     -v bosh-lite-pools-github-private-key="$(lpass show Shared-CLI/bosh-lite-pool-github-key --notes)" \
     -v bosh-lite-project-id=CF-CLI \
     -v bosh-lite-region=us-west1 \
@@ -74,7 +74,7 @@ check_installed lpass
 check_installed fly
 
 # Make sure we're up to date and that we're logged in.
-#lpass sync
+# lpass sync
 
 pipelines_path=$(cd $(dirname $0)/.. && pwd)
 
