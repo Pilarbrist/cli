@@ -22,17 +22,25 @@ resources:
         bucket: ((bosh-lite-storage-bucket))
         prefix: terraform_state_files/
         region: ((bosh-lite-region))
-        credentials: {{bosh-lite-gcp-json-key}}
+        credentials: ((bosh-lite-gcp-json-key))
+  - name: cli
+    type: git
+    source:
+      branch: master
+      uri: git@github.com:cloudfoundry/cli.git
+      private_key: ((bosh-lite-pools-github-private-key))
   - name: capi-ci
     type: git
     source:
       branch: master
-      uri: https://github.com/cloudfoundry/capi-ci.git
+      uri: git@github.com:cloudfoundry/capi-ci.git
+      private_key: ((bosh-lite-pools-github-private-key))
   - name: bosh-deployment
     type: git
     source:
       branch: master
-      uri: https://github.com/cloudfoundry/bosh-deployment.git
+      uri: git@github.com:cloudfoundry/bosh-deployment.git
+      private_key: ((bosh-lite-pools-github-private-key))
   - name: ready-pool
     type: pool
     source:
@@ -80,7 +88,8 @@ resources:
     type: git
     source:
       branch: release-candidate
-      uri: https://github.com/cloudfoundry/cf-deployment.git
+      uri: git@github.com:cloudfoundry/cf-deployment.git
+      private_key: ((bosh-lite-pools-github-private-key))
   - name: cf-deploy
     type: bosh-deployment
     source:
@@ -97,6 +106,7 @@ jobs:
         - get: capi-ci
         - get: bosh-deployment
         - get: cf-deployment
+        - get: cli
         - get: create-bosh-lite-trigger
           trigger: true
       - task: generate-fake-env-for-building-pool
@@ -122,7 +132,7 @@ jobs:
             file: capi-ci/ci/bosh-lite/create-bosh-lite.yml
             params:
               GCP_JSON_KEY: ((bosh-lite-gcp-json-key))
-              GCP_INSTANCE_TYPE: n1-standard-4 # TODO: make a chore to experiment with instance sizes?
+              GCP_INSTANCE_TYPE: n1-standard-4
           - do:
               - task: create-env-vars-file
                 file: capi-ci/ci/bosh-lite/create-env-vars-file.yml
@@ -136,12 +146,16 @@ jobs:
                   manifest: cf-deployment/cf-deployment.yml
                   vars_files:
                   - bosh-target/vars.yml
-                  ops_files: # TODO: add the ops files we need
+                  ops_files:
                   - capi-ci/cf-deployment-operations/skip-cert-verify.yml
                   - capi-ci/cf-deployment-operations/use-latest-stemcell.yml
                   - cf-deployment/operations/bosh-lite.yml
                   - cf-deployment/operations/use-compiled-releases.yml
+                  - cf-deployment/operations/test/add-persistent-isolation-segment-diego-cell.yml
+                  - cf-deployment/operations/test/add-persistent-isolation-segment-diego-cell-bosh-lite.yml
                   - capi-ci/cf-deployment-operations/seed-credhub-asg.yml
+                  - cli/ci/infrastructure/operations/default-app-memory.yml
+                  - cli/ci/infrastructure/operations/add-oidc-provider.yml
               - task: upload-to-gcs
                 file: capi-ci/ci/gcs/upload-to-gcs.yml
                 input_mapping:
@@ -245,7 +259,7 @@ jobs:
         input_mapping:
           env-pool: pool-repo
         params:
-          MIN_UNCLAIMED_COUNT: 1 # TODO: smaller team, can we use a lower number?
+          MIN_UNCLAIMED_COUNT: 2
           GIT_USERNAME: ((git-username))
           GIT_EMAIL: ((git-email))
       - put: pool-repo

@@ -59,12 +59,12 @@ configure_bosh_lite_pool_pipeline() {
     -p $name \
     -c $pipelines_path/cli-dev-bosh-lite/pipeline.yml \
     -v bosh-lite-dns-zone-name=bosh-lite-pool \
-    -v bosh-lite-gcp-json-key="$(lpass show Shared-CLI/bosh-service-account-gcp-creds --notes | jq -c .)" \
+    -v bosh-lite-gcp-json-key="$(lpass show Shared-CLI/bosh-service-account-gcp-creds --notes | jq -c . )" \
     -v bosh-lite-pools-github-private-key="$(lpass show Shared-CLI/bosh-lite-pool-github-key --notes)" \
-    -v bosh-lite-project-id=CF-CLI \
+    -v bosh-lite-project-id=cf-cli \
     -v bosh-lite-region=us-west1 \
     -v bosh-lite-storage-bucket=bosh-lites \
-    -v bosh-lite-system-domain-suffix=cli.fun \
+    -v bosh-lite-system-domain-suffix=lite.cli.fun \
     -v git-email=cf-cli-eng@pivotal.io \
     -v git-username=cf-cli-eng \
     -v env-pool-repo=git@github.com:cloudfoundry/cli-pools.git
@@ -74,7 +74,7 @@ check_installed lpass
 check_installed fly
 
 # Make sure we're up to date and that we're logged in.
-# lpass sync
+#lpass sync
 
 pipelines_path=$(cd $(dirname $0)/.. && pwd)
 
