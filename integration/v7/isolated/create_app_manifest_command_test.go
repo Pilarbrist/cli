@@ -1,5 +1,3 @@
-// +build !partialPush
-
 package isolated
 
 import (
@@ -69,8 +67,8 @@ var _ = Describe("create-app-manifest command", func() {
 			Eventually(session).Should(Say("USAGE:"))
 			Eventually(session).Should(Say(`cf create-app-manifest APP_NAME \[-p \/path\/to\/<app-name>_manifest\.yml\]`))
 			Eventually(session).Should(Say(""))
-			Eventually(session).Should(Say("OPTIONS:"))
-			Eventually(session).Should(Say("-p      Specify a path for file creation. If path not specified, manifest file is created in current working directory."))
+			// Eventually(session).Should(Say("OPTIONS:"))
+			// Eventually(session).Should(Say("-p      Specify a path for file creation. If path not specified, manifest file is created in current working directory."))
 			Eventually(session).Should(Say("SEE ALSO:"))
 			Eventually(session).Should(Say("apps, push"))
 
@@ -117,11 +115,11 @@ var _ = Describe("create-app-manifest command", func() {
 		})
 
 		When("the app does not exist", func() {
-			It("displays a usage error", func() {
+			It("displays an app not found error", func() {
 				session := helpers.CustomCF(helpers.CFEnv{WorkingDirectory: tempDir}, "create-app-manifest", appName)
 				Eventually(session).Should(Say(`Creating an app manifest from current settings of app %s in org %s / space %s as %s\.\.\.`, appName, orgName, spaceName, userName))
-				Eventually(session).Should(Say("FAILED"))
 				Eventually(session.Err).Should(Say("App %s not found", appName))
+				Eventually(session).Should(Say("FAILED"))
 
 				Eventually(session).Should(Exit(1))
 			})
