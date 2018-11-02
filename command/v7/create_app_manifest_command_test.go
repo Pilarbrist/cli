@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"code.cloudfoundry.org/cli/actor/actionerror"
 	"code.cloudfoundry.org/cli/actor/v7action"
@@ -110,9 +111,10 @@ var _ = Describe("create-app-manifest Command", func() {
 			})
 
 			It("displays the file it created and returns no errors", func() {
+				pathToYAMLFile := filepath.Join(tempDir, "some-app.yml")
 				Expect(testUI.Out).To(Say("Creating an app manifest from current settings of app some-app in org some-org / space some-space as some-user..."))
 				Expect(testUI.Err).To(Say("some-warning"))
-				Expect(testUI.Out).To(Say("Manifest file created successfully at some-file-path"))
+				Expect(testUI.Out).To(Say("Manifest file created successfully at %s", regexp.QuoteMeta(pathToYAMLFile)))
 				Expect(testUI.Out).To(Say("OK"))
 				Expect(executeErr).ToNot(HaveOccurred())
 
@@ -121,7 +123,7 @@ var _ = Describe("create-app-manifest Command", func() {
 				Expect(appArg).To(Equal("some-app"))
 				Expect(spaceArg).To(Equal("some-space-guid"))
 
-				fileContents, err := ioutil.ReadFile(filepath.Join(tempDir, "some-app.yml"))
+				fileContents, err := ioutil.ReadFile(pathToYAMLFile)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(string(fileContents)).To(Equal(yamlContents))
 			})
@@ -150,7 +152,7 @@ var _ = Describe("create-app-manifest Command", func() {
 			// 	})
 		})
 
-		When("writing the file errors", func(){
+		When("writing the file errors", func() {
 			var yamlContents string
 			BeforeEach(func() {
 				cmd.PWD = filepath.Join("should", "be", "unwritable")

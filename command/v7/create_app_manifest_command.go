@@ -77,12 +77,15 @@ func (cmd CreateAppManifestCommand) Execute(args []string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(filepath.Join(cmd.PWD, fmt.Sprintf("%s.yml", appName)), manifestBytes, 0666)
+	pathToYAMLFile := filepath.Join(cmd.PWD, fmt.Sprintf("%s.yml", appName))
+	err = ioutil.WriteFile(pathToYAMLFile, manifestBytes, 0666)
 	if err != nil {
 		return err
 	}
 
-	cmd.UI.DisplayText("Manifest file created successfully at some-file-path")
+	cmd.UI.DisplayText("Manifest file created successfully at {{.FilePath}}", map[string]interface{}{
+		"FilePath": pathToYAMLFile,
+	})
 	cmd.UI.DisplayOK()
 
 	return nil
