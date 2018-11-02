@@ -17,11 +17,8 @@ func (client *Client) GetApplicationManifest(appGUID string) ([]byte, Warnings, 
 	}
 	request.Header.Set("Accept", "application/x-yaml")
 
-	var rawYAML []byte
-	response := cloudcontroller.Response{
-		Result: &rawYAML,
-	}
+	var response cloudcontroller.Response
 	err = client.connection.Make(request, &response)
 
-	return rawYAML, response.Warnings, err
+	return response.RawResponse, response.Warnings, err
 }
