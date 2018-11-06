@@ -4,14 +4,15 @@ import (
 	"os"
 
 	"code.cloudfoundry.org/cli/actor/actionerror"
-	"code.cloudfoundry.org/cli/actor/pushaction"
+	"code.cloudfoundry.org/cli/actor/v7pushaction"
 	"code.cloudfoundry.org/cli/actor/sharedaction"
 	"code.cloudfoundry.org/cli/actor/v2action"
-	"code.cloudfoundry.org/cli/actor/v3action"
+	"code.cloudfoundry.org/cli/actor/v7action"
 	"code.cloudfoundry.org/cli/command"
 	"code.cloudfoundry.org/cli/command/flag"
 	"code.cloudfoundry.org/cli/command/translatableerror"
-	"code.cloudfoundry.org/cli/command/v6/shared"
+	v7shared "code.cloudfoundry.org/cli/command/v7/shared"
+	v6shared "code.cloudfoundry.org/cli/command/v6/shared"
 	"code.cloudfoundry.org/cli/util/progressbar"
 
 	log "github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ import (
 //go:generate counterfeiter . ProgressBar
 
 type ProgressBar interface {
-	pushaction.ProgressBar
+	v7pushaction.ProgressBar
 	Complete()
 	Ready()
 }
@@ -28,17 +29,18 @@ type ProgressBar interface {
 //go:generate counterfeiter . PushActor
 
 type PushActor interface {
-	Actualize(state pushaction.PushState, progressBar pushaction.ProgressBar) (<-chan pushaction.PushState, <-chan pushaction.Event, <-chan pushaction.Warnings, <-chan error)
-	Conceptualize(setting pushaction.CommandLineSettings, spaceGUID string) ([]pushaction.PushState, pushaction.Warnings, error)
+	Actualize(state v7pushaction.PushState, progressBar v7pushaction.ProgressBar) (<-chan v7pushaction.PushState, <-chan v7pushaction.Event, <-chan v7pushaction.Warnings, <-chan error)
+	Conceptualize(setting v7pushaction.CommandLineSettings, spaceGUID string) ([]v7pushaction.PushState, v7pushaction.Warnings, error)
 }
 
 //go:generate counterfeiter . PushVersionActor
 
 type PushVersionActor interface {
-	CloudControllerAPIVersion() string
-	GetStreamingLogsForApplicationByNameAndSpace(appName string, spaceGUID string, client v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error)
-	PollStart(appGUID string, warningsChannel chan<- v3action.Warnings) error
-	RestartApplication(appGUID string) (v3action.Warnings, error)
+	AppActor
+
+	GetStreamingLogsForApplicationByNameAndSpace(appName string, spaceGUID string, client v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error)
+	PollStart(appGUID string, warningsChannel chan<- v7action.Warnings) error
+	RestartApplication(appGUID string) (v7action.Warnings, error)
 }
 
 type PushCommand struct {
@@ -56,12 +58,13 @@ type PushCommand struct {
 
 	UI                  command.UI
 	Config              command.Config
-	NOAAClient          v3action.NOAAClient
+	NOAAClient          v7action.NOAAClient
+	RouteActor			v7action.RouteActor
 	Actor               PushActor
 	VersionActor        PushVersionActor
 	SharedActor         command.SharedActor
-	AppSummaryDisplayer shared.AppSummaryDisplayer
-	PackageDisplayer    shared.PackageDisplayer
+	AppSummaryDisplayer v7shared.AppSummaryDisplayer
+	PackageDisplayer    v7shared.PackageDisplayer
 	ProgressBar         ProgressBar
 }
 
@@ -73,22 +76,25 @@ func (cmd *PushCommand) Setup(config command.Config, ui command.UI) error {
 	sharedActor := sharedaction.NewActor(config)
 	cmd.SharedActor = sharedActor
 
-	ccClient, uaaClient, err := shared.NewV3BasedClients(config, ui, true, "")
+	ccClient, uaaClient, err := v7shared.NewClients(config, ui, true, "")
 	if err != nil {
 		return err
 	}
-	v3Actor := v3action.NewActor(ccClient, config, sharedActor, uaaClient)
-	cmd.VersionActor = v3Actor
+	v7Actor := v7action.NewActor(ccClient, config, sharedActor, uaaClient)
+	cmd.VersionActor = v7Actor
 
-	ccClientV2, uaaClientV2, err := shared.NewClients(config, ui, true)
+	ccClientV2, uaaClientV2, err := v6shared.NewClients(config, ui, true)
 	if err != nil {
 		return err
 	}
 
 	v2Actor := v2action.NewActor(ccClientV2, uaaClientV2, config)
-	cmd.Actor = pushaction.NewActor(v2Actor, v3Actor, sharedActor)
+	cmd.RouteActor = v2Actor
+	cmd.Actor = v7pushaction.NewActor(v2Actor, v7Actor, sharedActor)
 
-	cmd.NOAAClient = shared.NewNOAAClient(ccClient.Info.Logging(), config, uaaClient, ui)
+	cmd.NOAAClient = v7shared.NewNOAAClient(ccClient.Info.Logging(), config, uaaClient, ui)
+
+	cmd.AppSummaryDisplayer = *v7shared.NewAppSummaryDisplayer(cmd.UI)
 
 	return nil
 }
@@ -144,7 +150,14 @@ func (cmd PushCommand) Execute(args []string) error {
 			return err
 		}
 
-		pollWarnings := make(chan v3action.Warnings)
+		appSummary, warnings, err := cmd.VersionActor.GetApplicationSummaryByNameAndSpace(updatedState.Application.Name, cmd.Config.TargetedSpace().GUID, false, cmd.RouteActor)
+		cmd.UI.DisplayWarnings(warnings)
+		if err != nil {
+			return err
+		}
+		cmd.AppSummaryDisplayer.AppDisplay(appSummary, true)
+
+		pollWarnings := make(chan v7action.Warnings)
 		done := make(chan bool)
 		go func() {
 			for {
@@ -177,13 +190,13 @@ func (cmd PushCommand) Execute(args []string) error {
 
 func (cmd PushCommand) processApplyStreams(
 	appName string,
-	stateStream <-chan pushaction.PushState,
-	eventStream <-chan pushaction.Event,
-	warningsStream <-chan pushaction.Warnings,
+	stateStream <-chan v7pushaction.PushState,
+	eventStream <-chan v7pushaction.Event,
+	warningsStream <-chan v7pushaction.Warnings,
 	errorStream <-chan error,
-) (pushaction.PushState, error) {
+) (v7pushaction.PushState, error) {
 	var stateClosed, eventClosed, warningsClosed, complete bool
-	var updateState pushaction.PushState
+	var updateState v7pushaction.PushState
 
 	for {
 		select {
@@ -214,7 +227,7 @@ func (cmd PushCommand) processApplyStreams(
 				warningsClosed = true
 				break
 			}
-			return pushaction.PushState{}, err
+			return v7pushaction.PushState{}, err
 		}
 
 		if stateClosed && eventClosed && warningsClosed && complete {
@@ -225,39 +238,39 @@ func (cmd PushCommand) processApplyStreams(
 	return updateState, nil
 }
 
-func (cmd PushCommand) processEvent(appName string, event pushaction.Event) bool {
+func (cmd PushCommand) processEvent(appName string, event v7pushaction.Event) bool {
 	log.Infoln("received apply event:", event)
 
 	switch event {
-	case pushaction.SkippingApplicationCreation:
+	case v7pushaction.SkippingApplicationCreation:
 		cmd.UI.DisplayTextWithFlavor("Updating app {{.AppName}}...", map[string]interface{}{
 			"AppName": appName,
 		})
-	case pushaction.CreatedApplication:
+	case v7pushaction.CreatedApplication:
 		cmd.UI.DisplayTextWithFlavor("Creating app {{.AppName}}...", map[string]interface{}{
 			"AppName": appName,
 		})
-	case pushaction.CreatingArchive:
+	case v7pushaction.CreatingArchive:
 		cmd.UI.DisplayTextWithFlavor("Packaging files to upload...")
-	case pushaction.UploadingApplicationWithArchive:
+	case v7pushaction.UploadingApplicationWithArchive:
 		cmd.UI.DisplayTextWithFlavor("Uploading files...")
 		log.Debug("starting progress bar")
 		cmd.ProgressBar.Ready()
-	case pushaction.RetryUpload:
+	case v7pushaction.RetryUpload:
 		cmd.UI.DisplayText("Retrying upload due to an error...")
-	case pushaction.UploadWithArchiveComplete:
+	case v7pushaction.UploadWithArchiveComplete:
 		cmd.ProgressBar.Complete()
 		cmd.UI.DisplayNewline()
 		cmd.UI.DisplayText("Waiting for API to complete processing files...")
-	case pushaction.StartingStaging:
+	case v7pushaction.StartingStaging:
 		cmd.UI.DisplayNewline()
 		cmd.UI.DisplayText("Staging app and tracing logs...")
 		logStream, errStream, warnings, _ := cmd.VersionActor.GetStreamingLogsForApplicationByNameAndSpace(appName, cmd.Config.TargetedSpace().GUID, cmd.NOAAClient)
 		cmd.UI.DisplayWarnings(warnings)
 		go cmd.getLogs(logStream, errStream)
-	case pushaction.StagingComplete:
+	case v7pushaction.StagingComplete:
 		cmd.NOAAClient.Close()
-	case pushaction.Complete:
+	case v7pushaction.Complete:
 		return true
 	default:
 		log.WithField("event", event).Debug("ignoring event")
@@ -265,7 +278,7 @@ func (cmd PushCommand) processEvent(appName string, event pushaction.Event) bool
 	return false
 }
 
-func (cmd PushCommand) getLogs(logStream <-chan *v3action.LogMessage, errStream <-chan error) {
+func (cmd PushCommand) getLogs(logStream <-chan *v7action.LogMessage, errStream <-chan error) {
 	for {
 		select {
 		case logMessage, open := <-logStream:
@@ -288,12 +301,12 @@ func (cmd PushCommand) getLogs(logStream <-chan *v3action.LogMessage, errStream 
 	}
 }
 
-func (cmd PushCommand) GetCommandLineSettings() (pushaction.CommandLineSettings, error) {
+func (cmd PushCommand) GetCommandLineSettings() (v7pushaction.CommandLineSettings, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
-		return pushaction.CommandLineSettings{}, err
+		return v7pushaction.CommandLineSettings{}, err
 	}
-	return pushaction.CommandLineSettings{
+	return v7pushaction.CommandLineSettings{
 		Buildpacks:       cmd.Buildpacks,
 		CurrentDirectory: pwd,
 		Name:             cmd.RequiredArgs.AppName,

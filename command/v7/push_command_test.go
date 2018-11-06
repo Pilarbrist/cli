@@ -1,40 +1,44 @@
 package v7_test
 
 import (
+	"code.cloudfoundry.org/cli/actor/v2action"
+	"code.cloudfoundry.org/cli/actor/v7action"
+	"code.cloudfoundry.org/cli/actor/v7pushaction"
+	"code.cloudfoundry.org/cli/api/cloudcontroller/ccv2"
 	"errors"
 	"os"
 	"time"
 
 	"code.cloudfoundry.org/cli/actor/actionerror"
-	"code.cloudfoundry.org/cli/actor/pushaction"
-	"code.cloudfoundry.org/cli/actor/v3action"
 	"code.cloudfoundry.org/cli/actor/v3action/v3actionfakes"
 	"code.cloudfoundry.org/cli/command/commandfakes"
 	"code.cloudfoundry.org/cli/command/flag"
 	"code.cloudfoundry.org/cli/command/translatableerror"
+	"code.cloudfoundry.org/cli/command/v7/v7fakes"
 	"code.cloudfoundry.org/cli/command/v6/v6fakes"
 	. "code.cloudfoundry.org/cli/command/v7"
-	"code.cloudfoundry.org/cli/command/v7/v7fakes"
+	"code.cloudfoundry.org/cli/types"
 	"code.cloudfoundry.org/cli/util/configv3"
 	"code.cloudfoundry.org/cli/util/ui"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gbytes"
 	. "github.com/onsi/gomega/gstruct"
+	"code.cloudfoundry.org/cli/api/cloudcontroller/ccv3"
 )
 
 type Step struct {
 	Error    error
-	Event    pushaction.Event
-	Warnings pushaction.Warnings
+	Event    v7pushaction.Event
+	Warnings v7pushaction.Warnings
 }
 
-func FillInValues(tuples []Step, state pushaction.PushState) func(pushaction.PushState, pushaction.ProgressBar) (<-chan pushaction.PushState, <-chan pushaction.Event, <-chan pushaction.Warnings, <-chan error) {
-	return func(pushaction.PushState, pushaction.ProgressBar) (<-chan pushaction.PushState, <-chan pushaction.Event, <-chan pushaction.Warnings, <-chan error) {
-		stateStream := make(chan pushaction.PushState)
+func FillInValues(tuples []Step, state v7pushaction.PushState) func(v7pushaction.PushState, v7pushaction.ProgressBar) (<-chan v7pushaction.PushState, <-chan v7pushaction.Event, <-chan v7pushaction.Warnings, <-chan error) {
+	return func(v7pushaction.PushState, v7pushaction.ProgressBar) (<-chan v7pushaction.PushState, <-chan v7pushaction.Event, <-chan v7pushaction.Warnings, <-chan error) {
+		stateStream := make(chan v7pushaction.PushState)
 
-		eventStream := make(chan pushaction.Event)
-		warningsStream := make(chan pushaction.Warnings)
+		eventStream := make(chan v7pushaction.Event)
+		warningsStream := make(chan v7pushaction.Warnings)
 		errorStream := make(chan error)
 
 		go func() {
@@ -54,7 +58,7 @@ func FillInValues(tuples []Step, state pushaction.PushState) func(pushaction.Pus
 			}
 
 			stateStream <- state
-			eventStream <- pushaction.Complete
+			eventStream <- v7pushaction.Complete
 		}()
 
 		return stateStream, eventStream, warningsStream, errorStream
@@ -62,13 +66,13 @@ func FillInValues(tuples []Step, state pushaction.PushState) func(pushaction.Pus
 }
 
 type LogEvent struct {
-	Log   *v3action.LogMessage
+	Log   *v7action.LogMessage
 	Error error
 }
 
-func ReturnLogs(logevents []LogEvent, passedWarnings v3action.Warnings, passedError error) func(appName string, spaceGUID string, client v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error) {
-	return func(appName string, spaceGUID string, client v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error) {
-		logStream := make(chan *v3action.LogMessage)
+func ReturnLogs(logevents []LogEvent, passedWarnings v7action.Warnings, passedError error) func(appName string, spaceGUID string, client v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error) {
+	return func(appName string, spaceGUID string, client v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error) {
+		logStream := make(chan *v7action.LogMessage)
 		errStream := make(chan error)
 		go func() {
 			defer close(logStream)
@@ -88,18 +92,19 @@ func ReturnLogs(logevents []LogEvent, passedWarnings v3action.Warnings, passedEr
 	}
 }
 
-var _ = Describe("push Command", func() {
+var _ = FDescribe("push Command", func() {
 	var (
-		cmd              PushCommand
-		testUI           *ui.UI
-		fakeConfig       *commandfakes.FakeConfig
-		fakeSharedActor  *commandfakes.FakeSharedActor
-		fakeActor        *v7fakes.FakePushActor
-		fakeVersionActor *v7fakes.FakePushVersionActor
-		fakeProgressBar  *v6fakes.FakeProgressBar
-		fakeNOAAClient   *v3actionfakes.FakeNOAAClient
-		binaryName       string
-		executeErr       error
+		binaryName                  string
+		cmd                         PushCommand
+		executeErr                  error
+		fakeActor                   *v7fakes.FakePushActor
+		fakePushVersionActor *v7fakes.FakePushVersionActor
+		fakeConfig                  *commandfakes.FakeConfig
+		fakeNOAAClient              *v3actionfakes.FakeNOAAClient
+		fakeProgressBar             *v6fakes.FakeProgressBar
+		fakeSharedActor             *commandfakes.FakeSharedActor
+		fakeVersionActor            *v7fakes.FakePushVersionActor
+		testUI                      *ui.UI
 
 		appName   string
 		userName  string
@@ -108,13 +113,14 @@ var _ = Describe("push Command", func() {
 	)
 
 	BeforeEach(func() {
-		testUI = ui.NewTestUI(nil, NewBuffer(), NewBuffer())
-		fakeConfig = new(commandfakes.FakeConfig)
-		fakeSharedActor = new(commandfakes.FakeSharedActor)
 		fakeActor = new(v7fakes.FakePushActor)
-		fakeVersionActor = new(v7fakes.FakePushVersionActor)
-		fakeProgressBar = new(v6fakes.FakeProgressBar)
+		fakePushVersionActor = new(v7fakes.FakePushVersionActor)
+		fakeConfig = new(commandfakes.FakeConfig)
 		fakeNOAAClient = new(v3actionfakes.FakeNOAAClient)
+		fakeProgressBar = new(v6fakes.FakeProgressBar)
+		fakeSharedActor = new(commandfakes.FakeSharedActor)
+		fakeVersionActor = new(v7fakes.FakePushVersionActor)
+		testUI = ui.NewTestUI(nil, NewBuffer(), NewBuffer())
 
 		binaryName = "faceman"
 		fakeConfig.BinaryNameReturns(binaryName)
@@ -191,45 +197,102 @@ var _ = Describe("push Command", func() {
 			})
 
 			When("getting app settings is successful", func() {
+				var (
+					applicationSummary v7action.ApplicationSummary
+				)
 				BeforeEach(func() {
 					fakeActor.ConceptualizeReturns(
-						[]pushaction.PushState{
+						[]v7pushaction.PushState{
 							{
-								Application: v3action.Application{Name: appName},
+								Application: v7action.Application{Name: appName},
 							},
 						},
-						pushaction.Warnings{"some-warning-1"}, nil)
+						v7pushaction.Warnings{"some-warning-1"}, nil)
 				})
 
 				Describe("actualizing non-logging events", func() {
 					BeforeEach(func() {
 						fakeActor.ActualizeStub = FillInValues([]Step{
 							{
-								Event:    pushaction.SkippingApplicationCreation,
-								Warnings: pushaction.Warnings{"skipping app creation warnings"},
+								Event:    v7pushaction.SkippingApplicationCreation,
+								Warnings: v7pushaction.Warnings{"skipping app creation warnings"},
 							},
 							{
-								Event:    pushaction.CreatedApplication,
-								Warnings: pushaction.Warnings{"app creation warnings"},
+								Event:    v7pushaction.CreatedApplication,
+								Warnings: v7pushaction.Warnings{"app creation warnings"},
 							},
 							{
-								Event: pushaction.CreatingArchive,
+								Event: v7pushaction.CreatingArchive,
 							},
 							{
-								Event:    pushaction.UploadingApplicationWithArchive,
-								Warnings: pushaction.Warnings{"upload app archive warning"},
+								Event:    v7pushaction.UploadingApplicationWithArchive,
+								Warnings: v7pushaction.Warnings{"upload app archive warning"},
 							},
 							{
-								Event:    pushaction.RetryUpload,
-								Warnings: pushaction.Warnings{"retry upload warning"},
+								Event:    v7pushaction.RetryUpload,
+								Warnings: v7pushaction.Warnings{"retry upload warning"},
 							},
 							{
-								Event: pushaction.UploadWithArchiveComplete,
+								Event: v7pushaction.UploadWithArchiveComplete,
 							},
 							{
-								Event: pushaction.StagingComplete,
+								Event: v7pushaction.StagingComplete,
 							},
-						}, pushaction.PushState{})
+						}, v7pushaction.PushState{})
+						v7ApplicationSummary := v7action.ApplicationSummary{
+							Application: v7action.Application{
+								Name: appName,
+							},
+							ProcessSummaries: v7action.ProcessSummaries{
+								{
+									Process: v7action.Process{
+										Type:       "aba",
+										Command:    "some-command-1",
+										MemoryInMB: types.NullUint64{Value: 32, IsSet: true},
+										DiskInMB:   types.NullUint64{Value: 1024, IsSet: true},
+									},
+								},
+								{
+									Process: v7action.Process{
+										Type:       "console",
+										Command:    "some-command-2",
+										MemoryInMB: types.NullUint64{Value: 16, IsSet: true},
+										DiskInMB:   types.NullUint64{Value: 512, IsSet: true},
+									},
+								},
+							},
+
+							CurrentDroplet: v7action.Droplet{
+								GUID:       "droplet-guid",
+								State:      "droplet-state",
+								CreatedAt:  "droplet-create-time",
+								Stack:      "droplet-stack",
+								Image:      "droplet-image",
+								Buildpacks: []ccv3.DropletBuildpack{
+									{
+											Name:         "droplet-buildpack-name",
+											DetectOutput: "droplet-detect-output",
+										},
+								},
+							},
+							Routes: []v2action.Route{
+									Domain: ccv2.Domain{
+										Name: "domain.domain.domain",
+									},
+									GUID: "route-guid",
+									Host: "route-host",
+									Path: "route-path",
+									Port: 1
+									SpaceGUID: "route-space-guid",
+								},
+							},
+						}
+						applicationSummary = v7ApplicationSummary
+						fakePushVersionActor.GetApplicationSummaryByNameAndSpaceReturns(
+							v7ApplicationSummary,
+							v7action.Warnings{"combo-summary-warning"},
+							nil)
+
 					})
 
 					It("generates a push state with the specified app path", func() {
@@ -269,26 +332,46 @@ var _ = Describe("push Command", func() {
 						Expect(testUI.Out).To(Say("Waiting for app to start..."))
 						Expect(fakeProgressBar.CompleteCallCount()).Should(Equal(1))
 					})
+
+					It("displays the app summary", func() {
+						Expect(executeErr).ToNot(HaveOccurred())
+
+						Expect(fakePushVersionActor.GetApplicationSummaryByNameAndSpaceCallCount()).To(Equal(1))
+						// passedAppName, spaceGUID, withObfuscatedValues := fakeApplicationSummaryActor.GetApplicationSummaryByNameAndSpaceArgsForCall(0)
+						// Expect(passedAppName).To(Equal(appName))
+						// Expect(spaceGUID).To(Equal("some-space-guid"))
+						// Expect(withObfuscatedValues).To(BeTrue())
+
+						Expect(testUI.Out).To(Say(`name:\s+%s`, appName))
+						Expect(testUI.Out).To(Say(`type:\s+aba`))
+						Expect(testUI.Out).To(Say(`instances:\s+0/0`))
+						Expect(testUI.Out).To(Say(`memory usage:\s+32M`))
+						Expect(testUI.Out).To(Say(`start command:\s+some-command-1`))
+						Expect(testUI.Out).To(Say(`type:\s+console`))
+						Expect(testUI.Out).To(Say(`instances:\s+0/0`))
+						Expect(testUI.Out).To(Say(`memory usage:\s+16M`))
+						Expect(testUI.Out).To(Say(`start command:\s+some-command-2`))
+					})
 				})
 
 				Describe("actualizing logging events", func() {
 					BeforeEach(func() {
 						fakeActor.ActualizeStub = FillInValues([]Step{
 							{
-								Event: pushaction.StartingStaging,
+								Event: v7pushaction.StartingStaging,
 							},
-						}, pushaction.PushState{})
+						}, v7pushaction.PushState{})
 					})
 
 					When("there are no logging errors", func() {
 						BeforeEach(func() {
 							fakeVersionActor.GetStreamingLogsForApplicationByNameAndSpaceStub = ReturnLogs(
 								[]LogEvent{
-									{Log: v3action.NewLogMessage("log-message-1", 1, time.Now(), v3action.StagingLog, "source-instance")},
-									{Log: v3action.NewLogMessage("log-message-2", 1, time.Now(), v3action.StagingLog, "source-instance")},
-									{Log: v3action.NewLogMessage("log-message-3", 1, time.Now(), "potato", "source-instance")},
+									{Log: v7action.NewLogMessage("log-message-1", 1, time.Now(), v7action.StagingLog, "source-instance")},
+									{Log: v7action.NewLogMessage("log-message-2", 1, time.Now(), v7action.StagingLog, "source-instance")},
+									{Log: v7action.NewLogMessage("log-message-3", 1, time.Now(), "potato", "source-instance")},
 								},
-								v3action.Warnings{"log-warning-1", "log-warning-2"},
+								v7action.Warnings{"log-warning-1", "log-warning-2"},
 								nil,
 							)
 						})
@@ -316,9 +399,9 @@ var _ = Describe("push Command", func() {
 								[]LogEvent{
 									{Error: errors.New("some-random-err")},
 									{Error: actionerror.NOAATimeoutError{}},
-									{Log: v3action.NewLogMessage("log-message-1", 1, time.Now(), v3action.StagingLog, "source-instance")},
+									{Log: v7action.NewLogMessage("log-message-1", 1, time.Now(), v7action.StagingLog, "source-instance")},
 								},
-								v3action.Warnings{"log-warning-1", "log-warning-2"},
+								v7action.Warnings{"log-warning-1", "log-warning-2"},
 								nil,
 							)
 						})
@@ -340,7 +423,7 @@ var _ = Describe("push Command", func() {
 					BeforeEach(func() {
 						fakeActor.ActualizeStub = FillInValues([]Step{
 							{},
-						}, pushaction.PushState{Application: v3action.Application{GUID: "potato"}})
+						}, v7pushaction.PushState{Application: v7action.Application{GUID: "potato"}})
 					})
 
 					// It("outputs flavor text prior to generating app configuration", func() {
@@ -348,7 +431,7 @@ var _ = Describe("push Command", func() {
 
 					When("restarting the app succeeds", func() {
 						BeforeEach(func() {
-							fakeVersionActor.RestartApplicationReturns(v3action.Warnings{"some-restart-warning"}, nil)
+							fakeVersionActor.RestartApplicationReturns(v7action.Warnings{"some-restart-warning"}, nil)
 						})
 
 						It("restarts the app and displays warnings", func() {
@@ -360,8 +443,8 @@ var _ = Describe("push Command", func() {
 
 						When("polling the restart succeeds", func() {
 							BeforeEach(func() {
-								fakeVersionActor.PollStartStub = func(appGUID string, warnings chan<- v3action.Warnings) error {
-									warnings <- v3action.Warnings{"some-poll-warning-1", "some-poll-warning-2"}
+								fakeVersionActor.PollStartStub = func(appGUID string, warnings chan<- v7action.Warnings) error {
+									warnings <- v7action.Warnings{"some-poll-warning-1", "some-poll-warning-2"}
 									return nil
 								}
 							})
@@ -376,8 +459,8 @@ var _ = Describe("push Command", func() {
 
 						When("polling the start fails", func() {
 							BeforeEach(func() {
-								fakeVersionActor.PollStartStub = func(appGUID string, warnings chan<- v3action.Warnings) error {
-									warnings <- v3action.Warnings{"some-poll-warning-1", "some-poll-warning-2"}
+								fakeVersionActor.PollStartStub = func(appGUID string, warnings chan<- v7action.Warnings) error {
+									warnings <- v7action.Warnings{"some-poll-warning-1", "some-poll-warning-2"}
 									return errors.New("some-error")
 								}
 							})
@@ -406,7 +489,7 @@ var _ = Describe("push Command", func() {
 
 					When("restarting the app fails", func() {
 						BeforeEach(func() {
-							fakeVersionActor.RestartApplicationReturns(v3action.Warnings{"some-restart-warning"}, errors.New("restart failure"))
+							fakeVersionActor.RestartApplicationReturns(v7action.Warnings{"some-restart-warning"}, errors.New("restart failure"))
 						})
 
 						It("returns an error and any warnings", func() {
@@ -422,7 +505,7 @@ var _ = Describe("push Command", func() {
 							{
 								Error: errors.New("anti avant garde naming"),
 							},
-						}, pushaction.PushState{})
+						}, v7pushaction.PushState{})
 					})
 
 					It("returns the error", func() {
@@ -436,7 +519,7 @@ var _ = Describe("push Command", func() {
 
 				BeforeEach(func() {
 					expectedErr = errors.New("some-error")
-					fakeActor.ConceptualizeReturns(nil, pushaction.Warnings{"some-warning-1"}, expectedErr)
+					fakeActor.ConceptualizeReturns(nil, v7pushaction.Warnings{"some-warning-1"}, expectedErr)
 				})
 
 				It("generates a push state with the specified app path", func() {
@@ -482,7 +565,7 @@ var _ = Describe("push Command", func() {
 	Describe("GetCommandLineSettings", func() {
 		Context("valid flag combinations", func() {
 			var (
-				settings               pushaction.CommandLineSettings
+				settings               v7pushaction.CommandLineSettings
 				commandLineSettingsErr error
 			)
 

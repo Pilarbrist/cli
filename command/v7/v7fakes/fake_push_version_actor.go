@@ -4,7 +4,7 @@ package v7fakes
 import (
 	sync "sync"
 
-	v3action "code.cloudfoundry.org/cli/actor/v3action"
+	v7action "code.cloudfoundry.org/cli/actor/v7action"
 	v7 "code.cloudfoundry.org/cli/command/v7"
 )
 
@@ -19,30 +19,64 @@ type FakePushVersionActor struct {
 	cloudControllerAPIVersionReturnsOnCall map[int]struct {
 		result1 string
 	}
-	GetStreamingLogsForApplicationByNameAndSpaceStub        func(string, string, v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error)
+	GetApplicationByNameAndSpaceStub        func(string, string) (v7action.Application, v7action.Warnings, error)
+	getApplicationByNameAndSpaceMutex       sync.RWMutex
+	getApplicationByNameAndSpaceArgsForCall []struct {
+		arg1 string
+		arg2 string
+	}
+	getApplicationByNameAndSpaceReturns struct {
+		result1 v7action.Application
+		result2 v7action.Warnings
+		result3 error
+	}
+	getApplicationByNameAndSpaceReturnsOnCall map[int]struct {
+		result1 v7action.Application
+		result2 v7action.Warnings
+		result3 error
+	}
+	GetApplicationSummaryByNameAndSpaceStub        func(string, string, bool, v7action.RouteActor) (v7action.ApplicationSummary, v7action.Warnings, error)
+	getApplicationSummaryByNameAndSpaceMutex       sync.RWMutex
+	getApplicationSummaryByNameAndSpaceArgsForCall []struct {
+		arg1 string
+		arg2 string
+		arg3 bool
+		arg4 v7action.RouteActor
+	}
+	getApplicationSummaryByNameAndSpaceReturns struct {
+		result1 v7action.ApplicationSummary
+		result2 v7action.Warnings
+		result3 error
+	}
+	getApplicationSummaryByNameAndSpaceReturnsOnCall map[int]struct {
+		result1 v7action.ApplicationSummary
+		result2 v7action.Warnings
+		result3 error
+	}
+	GetStreamingLogsForApplicationByNameAndSpaceStub        func(string, string, v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error)
 	getStreamingLogsForApplicationByNameAndSpaceMutex       sync.RWMutex
 	getStreamingLogsForApplicationByNameAndSpaceArgsForCall []struct {
 		arg1 string
 		arg2 string
-		arg3 v3action.NOAAClient
+		arg3 v7action.NOAAClient
 	}
 	getStreamingLogsForApplicationByNameAndSpaceReturns struct {
-		result1 <-chan *v3action.LogMessage
+		result1 <-chan *v7action.LogMessage
 		result2 <-chan error
-		result3 v3action.Warnings
+		result3 v7action.Warnings
 		result4 error
 	}
 	getStreamingLogsForApplicationByNameAndSpaceReturnsOnCall map[int]struct {
-		result1 <-chan *v3action.LogMessage
+		result1 <-chan *v7action.LogMessage
 		result2 <-chan error
-		result3 v3action.Warnings
+		result3 v7action.Warnings
 		result4 error
 	}
-	PollStartStub        func(string, chan<- v3action.Warnings) error
+	PollStartStub        func(string, chan<- v7action.Warnings) error
 	pollStartMutex       sync.RWMutex
 	pollStartArgsForCall []struct {
 		arg1 string
-		arg2 chan<- v3action.Warnings
+		arg2 chan<- v7action.Warnings
 	}
 	pollStartReturns struct {
 		result1 error
@@ -50,17 +84,17 @@ type FakePushVersionActor struct {
 	pollStartReturnsOnCall map[int]struct {
 		result1 error
 	}
-	RestartApplicationStub        func(string) (v3action.Warnings, error)
+	RestartApplicationStub        func(string) (v7action.Warnings, error)
 	restartApplicationMutex       sync.RWMutex
 	restartApplicationArgsForCall []struct {
 		arg1 string
 	}
 	restartApplicationReturns struct {
-		result1 v3action.Warnings
+		result1 v7action.Warnings
 		result2 error
 	}
 	restartApplicationReturnsOnCall map[int]struct {
-		result1 v3action.Warnings
+		result1 v7action.Warnings
 		result2 error
 	}
 	invocations      map[string][][]interface{}
@@ -119,13 +153,149 @@ func (fake *FakePushVersionActor) CloudControllerAPIVersionReturnsOnCall(i int, 
 	}{result1}
 }
 
-func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpace(arg1 string, arg2 string, arg3 v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error) {
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpace(arg1 string, arg2 string) (v7action.Application, v7action.Warnings, error) {
+	fake.getApplicationByNameAndSpaceMutex.Lock()
+	ret, specificReturn := fake.getApplicationByNameAndSpaceReturnsOnCall[len(fake.getApplicationByNameAndSpaceArgsForCall)]
+	fake.getApplicationByNameAndSpaceArgsForCall = append(fake.getApplicationByNameAndSpaceArgsForCall, struct {
+		arg1 string
+		arg2 string
+	}{arg1, arg2})
+	fake.recordInvocation("GetApplicationByNameAndSpace", []interface{}{arg1, arg2})
+	fake.getApplicationByNameAndSpaceMutex.Unlock()
+	if fake.GetApplicationByNameAndSpaceStub != nil {
+		return fake.GetApplicationByNameAndSpaceStub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2, ret.result3
+	}
+	fakeReturns := fake.getApplicationByNameAndSpaceReturns
+	return fakeReturns.result1, fakeReturns.result2, fakeReturns.result3
+}
+
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpaceCallCount() int {
+	fake.getApplicationByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationByNameAndSpaceMutex.RUnlock()
+	return len(fake.getApplicationByNameAndSpaceArgsForCall)
+}
+
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpaceCalls(stub func(string, string) (v7action.Application, v7action.Warnings, error)) {
+	fake.getApplicationByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationByNameAndSpaceStub = stub
+}
+
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpaceArgsForCall(i int) (string, string) {
+	fake.getApplicationByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationByNameAndSpaceMutex.RUnlock()
+	argsForCall := fake.getApplicationByNameAndSpaceArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpaceReturns(result1 v7action.Application, result2 v7action.Warnings, result3 error) {
+	fake.getApplicationByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationByNameAndSpaceStub = nil
+	fake.getApplicationByNameAndSpaceReturns = struct {
+		result1 v7action.Application
+		result2 v7action.Warnings
+		result3 error
+	}{result1, result2, result3}
+}
+
+func (fake *FakePushVersionActor) GetApplicationByNameAndSpaceReturnsOnCall(i int, result1 v7action.Application, result2 v7action.Warnings, result3 error) {
+	fake.getApplicationByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationByNameAndSpaceStub = nil
+	if fake.getApplicationByNameAndSpaceReturnsOnCall == nil {
+		fake.getApplicationByNameAndSpaceReturnsOnCall = make(map[int]struct {
+			result1 v7action.Application
+			result2 v7action.Warnings
+			result3 error
+		})
+	}
+	fake.getApplicationByNameAndSpaceReturnsOnCall[i] = struct {
+		result1 v7action.Application
+		result2 v7action.Warnings
+		result3 error
+	}{result1, result2, result3}
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpace(arg1 string, arg2 string, arg3 bool, arg4 v7action.RouteActor) (v7action.ApplicationSummary, v7action.Warnings, error) {
+	fake.getApplicationSummaryByNameAndSpaceMutex.Lock()
+	ret, specificReturn := fake.getApplicationSummaryByNameAndSpaceReturnsOnCall[len(fake.getApplicationSummaryByNameAndSpaceArgsForCall)]
+	fake.getApplicationSummaryByNameAndSpaceArgsForCall = append(fake.getApplicationSummaryByNameAndSpaceArgsForCall, struct {
+		arg1 string
+		arg2 string
+		arg3 bool
+		arg4 v7action.RouteActor
+	}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("GetApplicationSummaryByNameAndSpace", []interface{}{arg1, arg2, arg3, arg4})
+	fake.getApplicationSummaryByNameAndSpaceMutex.Unlock()
+	if fake.GetApplicationSummaryByNameAndSpaceStub != nil {
+		return fake.GetApplicationSummaryByNameAndSpaceStub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2, ret.result3
+	}
+	fakeReturns := fake.getApplicationSummaryByNameAndSpaceReturns
+	return fakeReturns.result1, fakeReturns.result2, fakeReturns.result3
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpaceCallCount() int {
+	fake.getApplicationSummaryByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.RUnlock()
+	return len(fake.getApplicationSummaryByNameAndSpaceArgsForCall)
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpaceCalls(stub func(string, string, bool, v7action.RouteActor) (v7action.ApplicationSummary, v7action.Warnings, error)) {
+	fake.getApplicationSummaryByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationSummaryByNameAndSpaceStub = stub
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpaceArgsForCall(i int) (string, string, bool, v7action.RouteActor) {
+	fake.getApplicationSummaryByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.RUnlock()
+	argsForCall := fake.getApplicationSummaryByNameAndSpaceArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpaceReturns(result1 v7action.ApplicationSummary, result2 v7action.Warnings, result3 error) {
+	fake.getApplicationSummaryByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationSummaryByNameAndSpaceStub = nil
+	fake.getApplicationSummaryByNameAndSpaceReturns = struct {
+		result1 v7action.ApplicationSummary
+		result2 v7action.Warnings
+		result3 error
+	}{result1, result2, result3}
+}
+
+func (fake *FakePushVersionActor) GetApplicationSummaryByNameAndSpaceReturnsOnCall(i int, result1 v7action.ApplicationSummary, result2 v7action.Warnings, result3 error) {
+	fake.getApplicationSummaryByNameAndSpaceMutex.Lock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.Unlock()
+	fake.GetApplicationSummaryByNameAndSpaceStub = nil
+	if fake.getApplicationSummaryByNameAndSpaceReturnsOnCall == nil {
+		fake.getApplicationSummaryByNameAndSpaceReturnsOnCall = make(map[int]struct {
+			result1 v7action.ApplicationSummary
+			result2 v7action.Warnings
+			result3 error
+		})
+	}
+	fake.getApplicationSummaryByNameAndSpaceReturnsOnCall[i] = struct {
+		result1 v7action.ApplicationSummary
+		result2 v7action.Warnings
+		result3 error
+	}{result1, result2, result3}
+}
+
+func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpace(arg1 string, arg2 string, arg3 v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error) {
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Lock()
 	ret, specificReturn := fake.getStreamingLogsForApplicationByNameAndSpaceReturnsOnCall[len(fake.getStreamingLogsForApplicationByNameAndSpaceArgsForCall)]
 	fake.getStreamingLogsForApplicationByNameAndSpaceArgsForCall = append(fake.getStreamingLogsForApplicationByNameAndSpaceArgsForCall, struct {
 		arg1 string
 		arg2 string
-		arg3 v3action.NOAAClient
+		arg3 v7action.NOAAClient
 	}{arg1, arg2, arg3})
 	fake.recordInvocation("GetStreamingLogsForApplicationByNameAndSpace", []interface{}{arg1, arg2, arg3})
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Unlock()
@@ -145,57 +315,57 @@ func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceCa
 	return len(fake.getStreamingLogsForApplicationByNameAndSpaceArgsForCall)
 }
 
-func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceCalls(stub func(string, string, v3action.NOAAClient) (<-chan *v3action.LogMessage, <-chan error, v3action.Warnings, error)) {
+func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceCalls(stub func(string, string, v7action.NOAAClient) (<-chan *v7action.LogMessage, <-chan error, v7action.Warnings, error)) {
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Lock()
 	defer fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Unlock()
 	fake.GetStreamingLogsForApplicationByNameAndSpaceStub = stub
 }
 
-func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceArgsForCall(i int) (string, string, v3action.NOAAClient) {
+func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceArgsForCall(i int) (string, string, v7action.NOAAClient) {
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.RLock()
 	defer fake.getStreamingLogsForApplicationByNameAndSpaceMutex.RUnlock()
 	argsForCall := fake.getStreamingLogsForApplicationByNameAndSpaceArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceReturns(result1 <-chan *v3action.LogMessage, result2 <-chan error, result3 v3action.Warnings, result4 error) {
+func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceReturns(result1 <-chan *v7action.LogMessage, result2 <-chan error, result3 v7action.Warnings, result4 error) {
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Lock()
 	defer fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Unlock()
 	fake.GetStreamingLogsForApplicationByNameAndSpaceStub = nil
 	fake.getStreamingLogsForApplicationByNameAndSpaceReturns = struct {
-		result1 <-chan *v3action.LogMessage
+		result1 <-chan *v7action.LogMessage
 		result2 <-chan error
-		result3 v3action.Warnings
+		result3 v7action.Warnings
 		result4 error
 	}{result1, result2, result3, result4}
 }
 
-func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceReturnsOnCall(i int, result1 <-chan *v3action.LogMessage, result2 <-chan error, result3 v3action.Warnings, result4 error) {
+func (fake *FakePushVersionActor) GetStreamingLogsForApplicationByNameAndSpaceReturnsOnCall(i int, result1 <-chan *v7action.LogMessage, result2 <-chan error, result3 v7action.Warnings, result4 error) {
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Lock()
 	defer fake.getStreamingLogsForApplicationByNameAndSpaceMutex.Unlock()
 	fake.GetStreamingLogsForApplicationByNameAndSpaceStub = nil
 	if fake.getStreamingLogsForApplicationByNameAndSpaceReturnsOnCall == nil {
 		fake.getStreamingLogsForApplicationByNameAndSpaceReturnsOnCall = make(map[int]struct {
-			result1 <-chan *v3action.LogMessage
+			result1 <-chan *v7action.LogMessage
 			result2 <-chan error
-			result3 v3action.Warnings
+			result3 v7action.Warnings
 			result4 error
 		})
 	}
 	fake.getStreamingLogsForApplicationByNameAndSpaceReturnsOnCall[i] = struct {
-		result1 <-chan *v3action.LogMessage
+		result1 <-chan *v7action.LogMessage
 		result2 <-chan error
-		result3 v3action.Warnings
+		result3 v7action.Warnings
 		result4 error
 	}{result1, result2, result3, result4}
 }
 
-func (fake *FakePushVersionActor) PollStart(arg1 string, arg2 chan<- v3action.Warnings) error {
+func (fake *FakePushVersionActor) PollStart(arg1 string, arg2 chan<- v7action.Warnings) error {
 	fake.pollStartMutex.Lock()
 	ret, specificReturn := fake.pollStartReturnsOnCall[len(fake.pollStartArgsForCall)]
 	fake.pollStartArgsForCall = append(fake.pollStartArgsForCall, struct {
 		arg1 string
-		arg2 chan<- v3action.Warnings
+		arg2 chan<- v7action.Warnings
 	}{arg1, arg2})
 	fake.recordInvocation("PollStart", []interface{}{arg1, arg2})
 	fake.pollStartMutex.Unlock()
@@ -215,13 +385,13 @@ func (fake *FakePushVersionActor) PollStartCallCount() int {
 	return len(fake.pollStartArgsForCall)
 }
 
-func (fake *FakePushVersionActor) PollStartCalls(stub func(string, chan<- v3action.Warnings) error) {
+func (fake *FakePushVersionActor) PollStartCalls(stub func(string, chan<- v7action.Warnings) error) {
 	fake.pollStartMutex.Lock()
 	defer fake.pollStartMutex.Unlock()
 	fake.PollStartStub = stub
 }
 
-func (fake *FakePushVersionActor) PollStartArgsForCall(i int) (string, chan<- v3action.Warnings) {
+func (fake *FakePushVersionActor) PollStartArgsForCall(i int) (string, chan<- v7action.Warnings) {
 	fake.pollStartMutex.RLock()
 	defer fake.pollStartMutex.RUnlock()
 	argsForCall := fake.pollStartArgsForCall[i]
@@ -251,7 +421,7 @@ func (fake *FakePushVersionActor) PollStartReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakePushVersionActor) RestartApplication(arg1 string) (v3action.Warnings, error) {
+func (fake *FakePushVersionActor) RestartApplication(arg1 string) (v7action.Warnings, error) {
 	fake.restartApplicationMutex.Lock()
 	ret, specificReturn := fake.restartApplicationReturnsOnCall[len(fake.restartApplicationArgsForCall)]
 	fake.restartApplicationArgsForCall = append(fake.restartApplicationArgsForCall, struct {
@@ -275,7 +445,7 @@ func (fake *FakePushVersionActor) RestartApplicationCallCount() int {
 	return len(fake.restartApplicationArgsForCall)
 }
 
-func (fake *FakePushVersionActor) RestartApplicationCalls(stub func(string) (v3action.Warnings, error)) {
+func (fake *FakePushVersionActor) RestartApplicationCalls(stub func(string) (v7action.Warnings, error)) {
 	fake.restartApplicationMutex.Lock()
 	defer fake.restartApplicationMutex.Unlock()
 	fake.RestartApplicationStub = stub
@@ -288,28 +458,28 @@ func (fake *FakePushVersionActor) RestartApplicationArgsForCall(i int) string {
 	return argsForCall.arg1
 }
 
-func (fake *FakePushVersionActor) RestartApplicationReturns(result1 v3action.Warnings, result2 error) {
+func (fake *FakePushVersionActor) RestartApplicationReturns(result1 v7action.Warnings, result2 error) {
 	fake.restartApplicationMutex.Lock()
 	defer fake.restartApplicationMutex.Unlock()
 	fake.RestartApplicationStub = nil
 	fake.restartApplicationReturns = struct {
-		result1 v3action.Warnings
+		result1 v7action.Warnings
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakePushVersionActor) RestartApplicationReturnsOnCall(i int, result1 v3action.Warnings, result2 error) {
+func (fake *FakePushVersionActor) RestartApplicationReturnsOnCall(i int, result1 v7action.Warnings, result2 error) {
 	fake.restartApplicationMutex.Lock()
 	defer fake.restartApplicationMutex.Unlock()
 	fake.RestartApplicationStub = nil
 	if fake.restartApplicationReturnsOnCall == nil {
 		fake.restartApplicationReturnsOnCall = make(map[int]struct {
-			result1 v3action.Warnings
+			result1 v7action.Warnings
 			result2 error
 		})
 	}
 	fake.restartApplicationReturnsOnCall[i] = struct {
-		result1 v3action.Warnings
+		result1 v7action.Warnings
 		result2 error
 	}{result1, result2}
 }
@@ -319,6 +489,10 @@ func (fake *FakePushVersionActor) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.cloudControllerAPIVersionMutex.RLock()
 	defer fake.cloudControllerAPIVersionMutex.RUnlock()
+	fake.getApplicationByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationByNameAndSpaceMutex.RUnlock()
+	fake.getApplicationSummaryByNameAndSpaceMutex.RLock()
+	defer fake.getApplicationSummaryByNameAndSpaceMutex.RUnlock()
 	fake.getStreamingLogsForApplicationByNameAndSpaceMutex.RLock()
 	defer fake.getStreamingLogsForApplicationByNameAndSpaceMutex.RUnlock()
 	fake.pollStartMutex.RLock()

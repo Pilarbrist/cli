@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega/gexec"
 )
 
-var _ = When("only the name is provided", func() {
+var _ = FWhen("only the name is provided", func() {
 	var (
 		appName    string
 		userName   string
@@ -61,7 +61,7 @@ var _ = When("only the name is provided", func() {
 		})
 	})
 
-	When("the app exists", func() {
+	FWhen("the app exists", func() {
 		BeforeEach(func() {
 			helpers.WithHelloWorldApp(func(appDir string) {
 				Eventually(helpers.CustomCF(helpers.CFEnv{WorkingDirectory: appDir},
@@ -76,33 +76,24 @@ var _ = When("only the name is provided", func() {
 					PushCommandName, appName,
 				)
 
-				Eventually(session).Should(Say(`Updating app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Uploading and creating bits package for app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Stopping app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Staging package for app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Setting app %s to droplet .+ in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Mapping routes\.\.\.`))
-				Eventually(session).Should(Say("OK"))
-				Eventually(session).Should(Say(`Starting app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
-				Eventually(session).Should(Say("OK"))
+				Eventually(session).Should(Say(`Pushing app %s to org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
+				Eventually(session).Should(Say(`Updating app %s\.\.\.`, appName))
+				Eventually(session).Should(Say(`Uploading files\.\.\.`))
+				Eventually(session).Should(Say(`Staging app and tracing logs\.\.\.`))
 				Eventually(session).Should(Say(`Waiting for app to start\.\.\.`))
-				Eventually(session).Should(Say(`Showing health and status for app %s in org %s / space %s as %s\.\.\.`, appName, organization, space, userName))
+
 				Eventually(session).Should(Say(`name:\s+%s`, appName))
 				Eventually(session).Should(Say(`requested state:\s+started`))
 				Eventually(session).Should(Say(`routes:\s+%s\.%s`, appName, domainName))
 				Eventually(session).Should(Say(`stack:\s+cflinuxfs2`))
-
 				Eventually(session).Should(Say(`buildpacks:\s+staticfile`))
+
 				Eventually(session).Should(Say(`type:\s+web`))
 				Eventually(session).Should(Say(`instances:\s+1/1`))
 				Eventually(session).Should(Say(`memory usage:\s+\d+(M|G)`))
-				Eventually(session).Should(Say(`state\s+since\s+cpu\s+memory\s+disk`))
-				Eventually(session).Should(Say(`#0\s+running\s+\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [AP]M`))
+				Eventually(session).Should(Say(`start command:\s+$HOME/boot.sh`))
+				Eventually(session).Should(Say(`state\s+since\s+cpu\s+memory\s+disk\s+details`))
+				Eventually(session).Should(Say(`#0\s+running\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\s+d+.d+%\s+d+[KMG] of d+[KMG]\s+d+[KMG] of d+[KMG]`))
 				Eventually(session).Should(Exit(0))
 			})
 		})
